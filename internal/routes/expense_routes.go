@@ -13,5 +13,6 @@ func RegisterExpenseRoutes(r *gin.RouterGroup, h *handlers.ExpenseHandler) {
 		expense.GET("/", h.GetExpenses)
 		expense.GET("/:id", h.GetExpensesById)
 		expense.PUT("/:id", h.UpdateExpense)
+		expense.DELETE("/:id", h.DeleteExpense)
 	}
 }

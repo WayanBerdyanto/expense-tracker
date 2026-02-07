@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"expense-tracker/internal/res"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,7 +23,7 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 	// BindJSON mirip req.body di Express
 	// Jika format JSON salah atau validasi gagal, return error
 	if err := c.ShouldBindJSON(&expense); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 		return
 	}
 
@@ -31,17 +33,14 @@ func (h *ExpenseHandler) CreateExpense(c *gin.Context) {
 
 	// Explicit Error Handling (Go Way)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
 		return
 	}
 
 	id, _ := result.LastInsertId()
 	expense.ID = int(id)
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Success create expense",
-		"data":    expense,
-	})
+	res.Success(c, http.StatusCreated, expense, nil)
 }
 
 // 2. Get All Expenses
@@ -65,7 +64,7 @@ func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
 	var total int
 	err := h.DB.QueryRow("SELECT COUNT(*) FROM expenses").Scan(&total)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
 		return
 	}
 
@@ -78,7 +77,7 @@ func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
 		LIMIT ? OFFSET ?
 	`, perPage, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
 		return
 	}
 	defer rows.Close() // Wajib tutup koneksi row setelah selesai (untuk memory leak prevention)
@@ -100,14 +99,11 @@ func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
 		expenses = append(expenses, e)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data": expenses,
-		"meta": gin.H{
-			"total":       total,
-			"page":        page,
-			"per_page":    perPage,
-			"total_pages": totalPages,
-		},
+	res.Success(c, http.StatusOK, expenses, gin.H{
+		"total":       total,
+		"page":        page,
+		"per_page":    perPage,
+		"total_pages": totalPages,
 	})
 }
 
@@ -126,16 +122,14 @@ func (h *ExpenseHandler) GetExpensesById(c *gin.Context) {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+			res.Error(c, http.StatusNotFound, "EXPENSE_NOT_FOUND", "Expense not found")
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data": expense,
-	})
+	res.Success(c, http.StatusOK, expense, nil)
 }
 
 // 4. Update Expense
@@ -147,7 +141,7 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 	// BindJSON mirip req.body di Express
 	// Jika format JSON salah atau validasi gagal, return error
 	if err := c.ShouldBindJSON(&expense); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
 		return
 	}
 
@@ -160,7 +154,7 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 	)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
 		return
 	}
 
@@ -168,16 +162,37 @@ func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
 	rowsAffected, err := result.RowsAffected()
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
 		return
 	}
 	if rowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+		res.Error(c, http.StatusNotFound, "EXPENSE_NOT_FOUND", "Expense not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Success update expense",
-		"data":    expense,
-	})
+	res.Success(c, http.StatusOK, expense, nil)
+}
+
+func (h *ExpenseHandler) DeleteExpense(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	result, err := h.DB.Exec("DELETE FROM expenses WHERE id = ?", id)
+
+	if err != nil {
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+
+	if err != nil {
+		res.Error(c, http.StatusInternalServerError, "INTERNAL_SERVER_ERROR", err.Error())
+		return
+	}
+	if rowsAffected == 0 {
+		res.Error(c, http.StatusNotFound, "EXPENSE_NOT_FOUND", "Expense not found")
+		return
+	}
+
+	res.Success(c, http.StatusOK, nil, nil)
 }
