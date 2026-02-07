@@ -110,3 +110,74 @@ func (h *ExpenseHandler) GetExpenses(c *gin.Context) {
 		},
 	})
 }
+
+// 3 Get Expense by ID
+func (h *ExpenseHandler) GetExpensesById(c *gin.Context) {
+	var expense models.Expense
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	err := h.DB.QueryRow("SELECT * FROM expenses WHERE id = ?", id).Scan(
+		&expense.ID,
+		&expense.Description,
+		&expense.Amount,
+		&expense.Category,
+		&expense.CreatedAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": expense,
+	})
+}
+
+// 4. Update Expense
+func (h *ExpenseHandler) UpdateExpense(c *gin.Context) {
+	var expense models.Expense
+
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	// BindJSON mirip req.body di Express
+	// Jika format JSON salah atau validasi gagal, return error
+	if err := c.ShouldBindJSON(&expense); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Query Raw SQL (Tanpa ORM)
+	result, err := h.DB.Exec("UPDATE expenses SET description = ?, amount = ?, category = ? WHERE id = ?",
+		expense.Description,
+		expense.Amount,
+		expense.Category,
+		id,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Check affected rows
+	rowsAffected, err := result.RowsAffected()
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Expense not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Success update expense",
+		"data":    expense,
+	})
+}
