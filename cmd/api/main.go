@@ -15,6 +15,7 @@ func main() {
 
 	// 2. Init Handler (Inject DB ke Handler)
 	expenseHandler := &handlers.ExpenseHandler{DB: db}
+	authHandler := &handlers.AuthHandler{DB: db}
 
 	// 3. Init Router (Gin)
 	r := gin.Default()
@@ -23,6 +24,7 @@ func main() {
 	v1 := r.Group("/api/v1")
 	{
 		routes.RegisterExpenseRoutes(v1, expenseHandler)
+		routes.RegisterAuthRoutes(v1, authHandler)
 	}
 
 	// 5. Run Server
